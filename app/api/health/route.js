@@ -1,14 +1,14 @@
 // Health check: confirms the Claude API key in Vercel works.
 // Sends one tiny request. Never returns or logs the key itself.
 import { getModel } from "../../../lib/model";
-import { callClaude } from "../../../lib/anthropic";
+import { callClaude, llmKey } from "../../../lib/anthropic";
 export const dynamic = "force-dynamic";
 
 // A health check that hangs for a minute is not a health check, so it waits far less than /api/check.
 const HEALTH_TIMEOUT_MS = 15000;
 
 export async function GET() {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = llmKey();
   if (!key) {
     return Response.json({ ok: false, problem: "ANTHROPIC_API_KEY is not set in Vercel (or the site was not redeployed after adding it)." });
   }

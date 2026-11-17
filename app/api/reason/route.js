@@ -2,12 +2,12 @@
 // Behind the site passcode like every other route. One small model call; reads nothing from
 // ClickUp and writes nothing anywhere.
 import { getModel } from "../../../lib/model";
-import { callClaude, textOf } from "../../../lib/anthropic";
+import { callClaude, textOf, llmKey } from "../../../lib/anthropic";
 import { MAX_CONVERSATION, REASON_SYSTEM, readReason, reasonUser } from "../../../lib/reason";
 export const dynamic = "force-dynamic";
 
 export async function POST(req) {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = llmKey();
   if (!key) return Response.json({ ok: false, problem: "ANTHROPIC_API_KEY is not set in Vercel." }, { status: 500 });
   const { model, note } = getModel();
   if (!model) return Response.json({ ok: false, problem: note }, { status: 500 });
