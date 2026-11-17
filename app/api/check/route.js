@@ -6,7 +6,7 @@ import { SKILL } from "../../../lib/skill";
 import { findCards, stateStatus } from "../../../lib/retrieve";
 import { getModel } from "../../../lib/model";
 import { getSql, toVec, isVector, stripMoney } from "../../../lib/db";
-import { callClaude, textOf } from "../../../lib/anthropic";
+import { callClaude, textOf, llmKey } from "../../../lib/anthropic";
 import { runAgentic, addUsage, cardTag, AGENTIC_NOTE } from "../../../lib/agentic";
 import { CARDS } from "../../../data/cards";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ const SEMANTIC_CARD_LIMIT = 4;
 const CARD_BY_ID = new Map(CARDS.map((c) => [c.id, c]));
 
 export async function POST(req) {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = llmKey();
   if (!key) return Response.json({ ok: false, problem: "ANTHROPIC_API_KEY is not set in Vercel." }, { status: 500 });
   const { model, note } = getModel();
   if (!model) return Response.json({ ok: false, problem: note }, { status: 500 });
