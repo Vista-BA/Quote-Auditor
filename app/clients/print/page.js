@@ -1,6 +1,6 @@
 "use client";
 // One client's quote review as a printable page: the browser's Print, or Save as PDF, makes the
-// PDF (the way OBI prints its quotes), so no PDF library is needed. Built from /api/clients, the
+// PDF, so no PDF library is needed. Built from /api/clients, the
 // same numbers as the Clients page. No dollar amounts. A draft until the manager decides what a
 // client may see, and it says so on the page.
 import { useEffect, useState } from "react";

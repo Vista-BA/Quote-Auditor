@@ -56,7 +56,7 @@ export default function Fixes() {
               </tbody>
             </table></div>
           )}
-          <div className="note">In OBI's ClickUp sample the box was ticked at done or invoiced, never at quote ready, so it looks like a review later in the job, not the TL's check before sending. A red quote that was ticked is one to look at: either that review does not look at Tech 2, or the flag was wrong. Sample a few before drawing a conclusion.</div>
+          <div className="note">In a sample of 300 ClickUp work orders the box was ticked at done or invoiced, never at quote ready, so it looks like a review later in the job, not the TL's check before sending. A red quote that was ticked is one to look at: either that review does not look at Tech 2, or the flag was wrong. Sample a few before drawing a conclusion.</div>
         </div>
       </div>
 
