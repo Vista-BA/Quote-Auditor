@@ -34,7 +34,8 @@ eq("within the NTE", nteFact(PHASED, 690), { state: "within", pct: 100 });
 eq("no NTE on the task", nteFact(PHASED, null), { state: "no nte", pct: null });
 eq("no total to compare", nteFact("2 hours labor Tech 1", 500), { state: "no total", pct: null });
 eq("NTE words carry no dollar amount", /\$/.test(nteText({ state: "over", pct: 138 })), false);
-eq("NTE words say what to do", nteText({ state: "over", pct: 138 }), "Over NTE: the quote is 138% of the NTE. Ask the client for an NTE increase before sending.");
+eq("NTE words say what to do", nteText({ state: "over", pct: 138 }), "Needs an NTE increase: the quote is 138% of the NTE. Send the increase request with the quote.");
+eq("an impossible NTE is flagged as the NTE field's fault", nteText({ state: "over", pct: 59250000 }).startsWith("The NTE on the work order looks wrong"), true);
 
 // ---------- overtime ----------
 eq("overtime on a labor line, no reason", overtimeOf("Tech reported: door\n3 hours labor Tech 1 OT $[removed]"), { billed: true, reason: false, words: null });

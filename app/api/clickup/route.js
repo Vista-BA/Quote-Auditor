@@ -31,7 +31,7 @@ export async function GET(req) {
   } catch (e) {
     return Response.json({ ok: false, problem: e?.name === "TimeoutError" ? "ClickUp did not answer in time." : "Could not reach ClickUp." }, { status: 502 });
   }
-  if (r.status === 401) return Response.json({ ok: false, problem: "ClickUp refused the token in CLICKUP_API_TOKEN." }, { status: 502 });
+  if (r.status === 401) return Response.json({ ok: false, problem: "ClickUp did not find a task you can open with that ID. Paste the task link (Copy link in ClickUp). A client WO number such as 835710 is the task's name, not its ID. If links fail too, the token's account cannot see that list." }, { status: 502 });
   if (r.status === 404) return Response.json({ ok: false, problem: "No ClickUp task with that id." }, { status: 404 });
   if (!r.ok) return Response.json({ ok: false, problem: `ClickUp answered ${r.status}.` }, { status: 502 });
 

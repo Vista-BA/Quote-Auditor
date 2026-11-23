@@ -43,7 +43,7 @@ export default function ClientReport() {
         <div><div className="lbl">Quotes checked</div><div className="val">{c.checked}</div></div>
         <div><div className="lbl">Tech 2 without a written reason</div><div className="val">{c.red} of {c.with_t2}</div></div>
         <div><div className="lbl">Tech 2 hours without a reason</div><div className="val">{hrs(c.hours_no_reason)}</div></div>
-        <div><div className="lbl">Over NTE</div><div className="val">{c.over_nte}</div></div>
+        <div><div className="lbl">Need an NTE increase</div><div className="val">{c.over_nte}</div></div>
         <div><div className="lbl">Overtime without a reason</div><div className="val">{c.ot_no_reason} of {c.ot}</div></div>
       </section>
 
@@ -76,7 +76,7 @@ export default function ClientReport() {
       )}
       {withList && c.others?.length > 0 && (
         <section>
-          <h2>Over NTE or overtime without a reason</h2>
+          <h2>NTE increase needed, or overtime without a reason</h2>
           <table>
             <thead><tr><th>Work order</th><th>NTE</th><th>Overtime</th></tr></thead>
             <tbody>{c.others.map((r) => <tr key={r.task_id}><td className="mono">{r.task_name}</td><td>{r.nte_pct ? `${r.nte_pct}% of NTE` : "-"}</td><td>{r.ot ? "No reason written" : "-"}</td></tr>)}</tbody>
@@ -86,7 +86,7 @@ export default function ClientReport() {
 
       <footer className="report-foot">
         <p>"Without a reason" means the quote bills a second tech, or overtime, but does not say why. It is a point to fix in the quote, not proof the work did not need it. The overtime rule is not agreed yet.</p>
-        <p><b>Draft for internal review.</b> Prepared by Quote Builder on {day(new Date())}. Your manager decides what is shared with the client.</p>
+        <p><b>Draft for internal review.</b> Prepared by Quote Auditor on {day(new Date())}. Your manager decides what is shared with the client.</p>
       </footer>
     </div>
   );
