@@ -103,7 +103,7 @@ export default function Queue() {
   useEffect(() => { load(); }, []);
 
   async function runNow() {
-    if (!confirm("Check up to 20 waiting quotes now?")) return;
+    if (!confirm("Check up to 40 waiting quotes now?")) return;
     setRunning({ busy: true });
     try { setRunning(await (await fetch("/api/clickup/sync?manual=1")).json()); }
     catch { setRunning({ ok: false, problem: "Could not reach the check." }); }
