@@ -17,11 +17,12 @@ eq("key from either variable", [llmKey({ ANTHROPIC_API_KEY: "a" }), llmKey({ OPE
 
 const body = toOpenRouter({ model: "claude-haiku-5-5", system: [{ type: "text", text: "SKILL", cache_control: { type: "ephemeral" } }, { type: "text", text: "cards" }], user: "quote", maxTokens: 4000 }, {});
 eq("system blocks keep the cache mark", body.messages[0], { role: "system", content: [{ type: "text", text: "SKILL", cache_control: { type: "ephemeral" } }, { type: "text", text: "cards" }] });
-eq("user message and limits", [body.messages[1], body.max_tokens, body.model], [{ role: "user", content: "quote" }, 4000, "anthropic/claude-haiku-5.5"]);
+eq("user message and limits", [body.messages[1], body.max_tokens, body.model], [{ role: "user", content: "quote" }, 16000, "anthropic/claude-haiku-5.5"]);
 
 const reply = fromOpenRouter({ model: "anthropic/claude-haiku-5.5", choices: [{ message: { content: "This quote doesn't show a reason." }, finish_reason: "stop" }], usage: { prompt_tokens: 5000, completion_tokens: 300, prompt_tokens_details: { cached_tokens: 4200 } } });
 eq("reply in Anthropic's shape", [reply.content, reply.stop_reason], [[{ type: "text", text: "This quote doesn't show a reason." }], "end_turn"]);
 eq("usage keeps the cached part apart", reply.usage, { input_tokens: 800, output_tokens: 300, cache_read_input_tokens: 4200, cache_creation_input_tokens: 0 });
+eq("a tiny call keeps its own limit", toOpenRouter({ model: "m", user: "x", maxTokens: 5 }, {}).max_tokens, 5);
 eq("cut off answer reads as max_tokens", fromOpenRouter({ choices: [{ message: { content: "x" }, finish_reason: "length" }] }).stop_reason, "max_tokens");
 
 // the whole call, fetch faked
