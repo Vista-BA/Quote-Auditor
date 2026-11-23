@@ -24,8 +24,13 @@ const FILTERS = [
   // Shown in the tool only, never written to ClickUp.
   { key: "nte", label: "NTE increase" },
   { key: "ot", label: "Overtime, no reason" },
+  // More checks worked out in code (lib/audit.js), shown in the tool only.
+  { key: "incomplete", label: "Incomplete quote" },
+  { key: "dupe", label: "Possible duplicate" },
+  { key: "waiting", label: "Waiting longest" },
 ];
-const extraOf = (r) => ({ nte: r.nte?.state === "over", ot: !!r.ot && !r.ot.reason });
+const EXTRA = new Set(["nte", "ot", "incomplete", "dupe", "waiting"]);
+const extraOf = (r) => ({ nte: r.nte?.state === "over", ot: !!r.ot?.flag, incomplete: r.complete ? !r.complete.complete : false, dupe: (r.duplicates || []).length > 0, waiting: r.days_waiting != null });
 
 // The stored answer, drawn like the check page's verdict card.
 function Answer({ text }) {
@@ -115,9 +120,13 @@ export default function Queue() {
   const keyOf = (r) => (r.ok ? toneOf(r).cls : "failed");
   const counts = useMemo(() => rows.reduce((c, r) => {
     const x = extraOf(r);
-    return { ...c, [keyOf(r)]: (c[keyOf(r)] || 0) + 1, nte: (c.nte || 0) + (x.nte ? 1 : 0), ot: (c.ot || 0) + (x.ot ? 1 : 0) };
+    const n = { ...c, [keyOf(r)]: (c[keyOf(r)] || 0) + 1 };
+    for (const k of EXTRA) n[k] = (c[k] || 0) + (x[k] ? 1 : 0);
+    return n;
   }, {}), [rows]);
-  const shown = filter === "all" ? rows : filter === "nte" || filter === "ot" ? rows.filter((r) => extraOf(r)[filter]) : rows.filter((r) => keyOf(r) === filter);
+  const shown = filter === "all" ? rows
+    : filter === "waiting" ? rows.filter((r) => r.days_waiting != null).sort((a, b) => b.days_waiting - a.days_waiting)
+    : EXTRA.has(filter) ? rows.filter((r) => extraOf(r)[filter]) : rows.filter((r) => keyOf(r) === filter);
   const sel = rows.find((r) => r.task_id === open);
 
   return (
@@ -188,7 +197,10 @@ export default function Queue() {
                       <td>
                         {r.ok ? <span className={`pill ${t.cls}`}><i />{t.label}</span> : <span className="pill close"><i />Failed</span>}
                         {nteBadge(r.nte) && <span className={`pill ${nteBadge(r.nte) === "Check NTE" ? "warn" : "wait"}`} title={r.nte.text}><i />{nteBadge(r.nte)}</span>}
-                        {r.ot && !r.ot.reason && <span className="pill wait" title={r.ot.text}><i />OT, no reason</span>}
+                        {r.ot?.flag && <span className="pill wait" title={r.ot.text}><i />{r.ot.rule === "not allowed" ? "OT not allowed" : "OT, no reason"}</span>}
+                        {r.complete && !r.complete.complete && <span className="pill warn" title={`Missing: ${r.complete.missing.join(", ")}`}><i />Incomplete</span>}
+                        {r.duplicates?.length > 0 && <span className="pill wait" title="Another quote for the same client, store and job in 30 days"><i />Duplicate?</span>}
+                        {filter === "waiting" && r.days_waiting != null && <span className="pill wait"><i />{r.days_waiting} d waiting</span>}
                       </td>
                       <td className="muted small num">{when(r.checked_at)}</td>
                     </tr>
@@ -238,10 +250,14 @@ export default function Queue() {
               )}
               {sel.changed_since && <div className="lint warn">The quote in ClickUp changed after this check and has not been checked again yet.</div>}
               {sel.ok && /^NO REASON/.test(sel.field || "") && <ReasonFinder quote={sel.quote || ""} key={sel.task_id} />}
-              {(sel.nte || sel.ot || sel.quote_check != null) && (
+              {(sel.nte || sel.ot || sel.quote_check != null || (sel.complete && !sel.complete.complete) || sel.confirm?.length > 0 || sel.duplicates?.length > 0 || sel.days_waiting != null) && (
                 <div className="facts-list">
                   {sel.nte && <div className={`note ${nteBadge(sel.nte) === "Check NTE" ? "warn" : ""}`}><b>NTE:</b> {sel.nte.text}</div>}
-                  {sel.ot && <div className={`note ${sel.ot.reason ? "" : "warn"}`}><b>Overtime:</b> {sel.ot.text}</div>}
+                  {sel.ot && <div className={`note ${sel.ot.flag ? "warn" : ""}`}><b>Overtime:</b> {sel.ot.text}</div>}
+                  {sel.complete && !sel.complete.complete && <div className="note warn"><b>Incomplete quote, missing:</b> {sel.complete.missing.join(", ")}.</div>}
+                  {sel.confirm?.length > 0 && <div className="note"><b>Confirm before sending:</b><ul style={{ margin: "6px 0 0 18px", padding: 0 }}>{sel.confirm.map((c, i) => <li key={i}>{c}</li>)}</ul></div>}
+                  {sel.duplicates?.length > 0 && <div className="note"><b>Possible duplicate:</b> same client, store and job within 30 days: {sel.duplicates.map((d, i) => <span key={d.task_id}>{i ? ", " : ""}{d.task_url ? <a href={d.task_url} target="_blank" rel="noreferrer">{d.task_name}</a> : d.task_name}</span>)}. Check it is not the same job quoted twice.</div>}
+                  {sel.days_waiting != null && <div className="note"><b>Waiting for approval:</b> at least {sel.days_waiting} {sel.days_waiting === 1 ? "day" : "days"} (counted from when the tool first saw it in this status).</div>}
                   {sel.quote_check != null && <div className="note"><b>Quote Check in ClickUp:</b> {sel.quote_check ? "ticked" : "not ticked yet"}.</div>}
                   <div className="small muted">These are shown here only. The tool writes nothing to ClickUp but the OSHA Check field.</div>
                 </div>

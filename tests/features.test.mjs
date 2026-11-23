@@ -9,6 +9,7 @@ import { readReason, reasonUser, REASON_SYSTEM } from "../lib/reason.js";
 import { clientPatterns, clientTotals } from "../lib/clients.js";
 import { taskFields } from "../lib/clickup.js";
 import { GUIDE, NOTES, guideFor } from "../lib/guide.js";
+import { completenessOf, confirmList, duplicatesOf, daysWaiting, isWaitingApproval, readRules, clientRule, overtimeRuleText } from "../lib/audit.js";
 import { crewCheckLine, KEYWORDS } from "../lib/fieldline.js";
 
 let pass = 0, fail = 0;
@@ -193,6 +194,36 @@ eq("fresh facts carry no amount", JSON.stringify(facts).includes("690") || JSON.
   const words = JSON.stringify([GUIDE, NOTES]);
   eq("guide words: no em dash, no dollar amount", [words.includes("\u2014"), /\$\s?\d/.test(words)], [false, false]);
   eq("every entry says what to tell the dispatcher", [...GUIDE, ...NOTES].every((g) => g.means && g.tell && g.tell.length < 400), true);
+}
+
+// ---------- more checks in code: completeness, facts to confirm, duplicates, waiting, client rules ----------
+{
+  const FULL = "Tech reported: door drags\nRequired is to: rehang door\n2 hours labor Tech 1 $[removed]\nGrand Total $[removed]";
+  eq("a full quote is complete", completenessOf(FULL), { complete: true, missing: [] });
+  eq("missing parts are named", completenessOf("Required is to: rehang door\n2 hours labor Tech 1").missing, ["What the tech found", "A total"]);
+  eq("no quote at all", completenessOf("").missing, ["The quote itself"]);
+  eq("labor needs hours on a labor line", completenessOf("Tech reported: x\nRequired is to: y\nTrip $[removed]\nTotal $[removed]").missing, ["Labor lines"]);
+  const ANS = "A second tech makes sense here for safety.\nOSHA: No | Safety: Need the mirror's weight | Two-person step: No\nWorth checking: the install height.";
+  eq("facts to confirm from the answer", confirmList(ANS), ["The mirror's weight", "The install height"]);
+  eq("nothing to confirm", confirmList("The second tech is justified.\nOSHA: No | Safety: No | Two-person step: Yes"), []);
+  const d = (id, fm, store, job, at) => ({ task_id: id, task_name: `WO ${id}`, fm, store, job, checked_at: at });
+  const dup = duplicatesOf([d("a", "EMCOR", "Store 12", "Door repair or replacement", "2026-11-01"), d("b", "emcor ", "store 12", "Door repair or replacement", "2026-11-20"),
+    d("c", "EMCOR", "Store 12", "Door repair or replacement", "2026-12-30"), d("e", "EMCOR", "Store 12", "Snake / clog / drain", "2026-11-02"), d("f", "EMCOR", null, "Door repair or replacement", "2026-11-03")]);
+  eq("same client, store and job within 30 days", Object.keys(dup).sort(), ["a", "b"]);
+  eq("names the other quote", dup.a.map((x) => x.task_id), ["b"]);
+  eq("two quotes without a store are never called duplicates", Object.keys(duplicatesOf([d("g", "EMCOR", null, "Door repair or replacement", "2026-11-01"), d("h", "EMCOR", "", "Door repair or replacement", "2026-11-02")])), []);
+  eq("days waiting from when it was first seen", daysWaiting("2026-11-20T00:00:00Z", Date.parse("2026-11-23T12:00:00Z")), 3);
+  eq("only waiting for approval counts", [isWaitingApproval("!! waiting for approval"), isWaitingApproval("quote ready")], [true, false]);
+  const rules = readRules({ CLIENT_RULES: '{"EMCOR": {"overtime": "allowed"}, "Flynn": {"overtime": "not allowed"}, "Laser": {"overtime": "with reason"}}' });
+  eq("rules match the client name whatever the case", clientRule(rules, "emcor")?.overtime, "allowed");
+  eq("bad rules JSON is ignored", readRules({ CLIENT_RULES: "{nope" }), null);
+  eq("overtime allowed", overtimeRuleText({ billed: true, reason: false }, clientRule(rules, "EMCOR")), "EMCOR allows overtime.");
+  eq("overtime not allowed", overtimeRuleText({ billed: true, reason: true }, clientRule(rules, "Flynn")), "Flynn does not allow overtime: quote regular time.");
+  eq("overtime needs a reason", overtimeRuleText({ billed: true, reason: false }, clientRule(rules, "Laser")).startsWith("Laser allows overtime only with a written reason"), true);
+  eq("no rule: the general note", overtimeRuleText({ billed: true, reason: false }, null), null);
+  const RED = "This quote doesn't show a reason for a second tech.\nOSHA: No | Safety: No | Two-person step: No";
+  const cl = clientPatterns([{ task_id: "x", task_name: "WO x", fm: "EMCOR", answer: RED, quote: "3 hours labor Tech 1 OT", ok: true, checked_at: "2026-11-23" }], null, rules);
+  eq("a client whose rule allows overtime is not counted for it", [cl[0].ot, cl[0].ot_no_reason, cl[0].rule.overtime], [1, 0, "allowed"]);
 }
 
 console.log(`${pass}/${pass + fail} passed`);
