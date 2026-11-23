@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { parseAnswer, pointsOf, quoteSnippet, toneOf as tone, valueClass } from "../../lib/answer";
 import ReasonFinder from "../reason-finder";
 import { guideFor } from "../../lib/guide";
+import { nteBadge } from "../../lib/quotefacts";
 
 // Same tones as the check page; the queue only needs the short class names.
 const CLS = { sig: "sig", warn: "warn", tape: "tape", ok: "ok", wait: "wait" };
@@ -21,7 +22,7 @@ const FILTERS = [
   { key: "wait", label: "No 2nd tech" },
   { key: "failed", label: "Failed" },
   // Shown in the tool only, never written to ClickUp.
-  { key: "nte", label: "Over NTE" },
+  { key: "nte", label: "NTE increase" },
   { key: "ot", label: "Overtime, no reason" },
 ];
 const extraOf = (r) => ({ nte: r.nte?.state === "over", ot: !!r.ot && !r.ot.reason });
@@ -151,7 +152,7 @@ export default function Queue() {
       {data && !data.ok && <div className="lint bad">{data.problem}</div>}
 
       <div className="grid g4">
-        <div className="card tile"><div className="lbl">Checked</div><div className="val">{rows.length}</div></div>
+        <div className="card tile"><div className="lbl">Latest checks</div><div className="val">{rows.length}</div></div>
         <div className="card tile focus"><div className="lbl">Needs a reason</div><div className="val">{counts.tape || 0}</div></div>
         <div className="card tile"><div className="lbl">Justified</div><div className="val">{(counts.ok || 0) + (counts.sig || 0)}</div></div>
         <div className="card tile"><div className="lbl">Check one fact</div><div className="val">{counts.warn || 0}</div></div>
@@ -186,7 +187,7 @@ export default function Queue() {
                       <td>{r.state || <span className="muted">-</span>}</td>
                       <td>
                         {r.ok ? <span className={`pill ${t.cls}`}><i />{t.label}</span> : <span className="pill close"><i />Failed</span>}
-                        {r.nte?.state === "over" && <span className="pill warn" title={r.nte.text}><i />Over NTE</span>}
+                        {nteBadge(r.nte) && <span className={`pill ${nteBadge(r.nte) === "Check NTE" ? "warn" : "wait"}`} title={r.nte.text}><i />{nteBadge(r.nte)}</span>}
                         {r.ot && !r.ot.reason && <span className="pill wait" title={r.ot.text}><i />OT, no reason</span>}
                       </td>
                       <td className="muted small num">{when(r.checked_at)}</td>
@@ -239,7 +240,7 @@ export default function Queue() {
               {sel.ok && /^NO REASON/.test(sel.field || "") && <ReasonFinder quote={sel.quote || ""} key={sel.task_id} />}
               {(sel.nte || sel.ot || sel.quote_check != null) && (
                 <div className="facts-list">
-                  {sel.nte && <div className={`note ${sel.nte.state === "over" ? "warn" : ""}`}><b>NTE:</b> {sel.nte.text}</div>}
+                  {sel.nte && <div className={`note ${nteBadge(sel.nte) === "Check NTE" ? "warn" : ""}`}><b>NTE:</b> {sel.nte.text}</div>}
                   {sel.ot && <div className={`note ${sel.ot.reason ? "" : "warn"}`}><b>Overtime:</b> {sel.ot.text}</div>}
                   {sel.quote_check != null && <div className="note"><b>Quote Check in ClickUp:</b> {sel.quote_check ? "ticked" : "not ticked yet"}.</div>}
                   <div className="small muted">These are shown here only. The tool writes nothing to ClickUp but the OSHA Check field.</div>

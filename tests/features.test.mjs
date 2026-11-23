@@ -1,11 +1,10 @@
 // Unit tests for the Nov 13 features: NTE and overtime facts, the Quote Check tick, quote versions
-// and follow-up reads, "fixed after the flag", the OBI connection and the reason finder.
+// and follow-up reads, "fixed after the flag" and the reason finder.
 // No network, no API credit: node tests/features.test.mjs
 import { quoteTotal, nteFact, nteText, overtimeOf, overtimeText, quoteCheckOf, nteOf, liveFacts } from "../lib/quotefacts.js";
 import { tracker, followUp, saveFacts } from "../lib/track.js";
 import { syncQuotes, hashOf } from "../lib/sync.js";
 import { impact, outcomeOf } from "../lib/impact.js";
-import { obiRefusal, freshResult, storedResult } from "../lib/obi.js";
 import { readReason, reasonUser, REASON_SYSTEM } from "../lib/reason.js";
 import { clientPatterns, clientTotals } from "../lib/clients.js";
 import { taskFields } from "../lib/clickup.js";
@@ -35,7 +34,8 @@ eq("within the NTE", nteFact(PHASED, 690), { state: "within", pct: 100 });
 eq("no NTE on the task", nteFact(PHASED, null), { state: "no nte", pct: null });
 eq("no total to compare", nteFact("2 hours labor Tech 1", 500), { state: "no total", pct: null });
 eq("NTE words carry no dollar amount", /\$/.test(nteText({ state: "over", pct: 138 })), false);
-eq("NTE words say what to do", nteText({ state: "over", pct: 138 }), "Over NTE: the quote is 138% of the NTE. Ask the client for an NTE increase before sending.");
+eq("NTE words say what to do", nteText({ state: "over", pct: 138 }), "Needs an NTE increase: the quote is 138% of the NTE. Send the increase request with the quote.");
+eq("an impossible NTE is flagged as the NTE field's fault", nteText({ state: "over", pct: 59250000 }).startsWith("The NTE on the work order looks wrong"), true);
 
 // ---------- overtime ----------
 eq("overtime on a labor line, no reason", overtimeOf("Tech reported: door\n3 hours labor Tech 1 OT $[removed]"), { billed: true, reason: false, words: null });
@@ -138,24 +138,6 @@ eq("fresh facts carry no amount", JSON.stringify(facts).includes("690") || JSON.
   // a red quote followed by ASK FIRST is not fixed
   const ask = impact([{ task_id: "q", ok: true, answer: RED, quote: T2(2), quote_hash: "h2", checked_at: "2" }], [v("q", "h1", R, 2, "1"), v("q", "h2", "ASK FIRST: whether there is hot work", 2, "2")]);
   eq("ask first after red is not a fix", ask.totals.fixed, 0);
-}
-
-// ---------- the OBI connection ----------
-eq("off without a key", obiRefusal("Bearer x", undefined).status, 501);
-eq("wrong key", obiRefusal("Bearer nope", "s3cret")?.status ?? "let through", 401);
-eq("missing key", obiRefusal(null, "s3cret")?.status ?? "let through", 401);
-eq("right key", obiRefusal("Bearer s3cret", "s3cret"), null);
-{
-  const RED = "This quote doesn't show a reason for a second tech.\nOSHA: No | Safety: No | Two-person step: No";
-  const f = freshResult({ answer: RED, quote: PHASED, nte: 500 });
-  eq("fresh result: the field line and keyword", [f.keyword, f.line], ["NO REASON", "NO REASON: remove Tech 2 or add a two-person step"]);
-  eq("fresh result: NTE as a percent", [f.nte.state, f.nte.pct], ["over", 138]);
-  eq("fresh result carries no dollar amount", /\$\s?\d/.test(JSON.stringify(f)), false);
-  eq("no NTE sent: no NTE in the result", freshResult({ answer: RED, quote: PHASED }).nte, null);
-  const s = storedResult({ task_id: "k1", ok: true, answer: RED, quote: "3 hours labor Tech 2", quote_hash: "a", now_hash: "b", nte_state: "within", nte_pct: 80, quote_check: false });
-  eq("stored result: changed since the check", [s.keyword, s.current, s.nte.pct, s.quote_check], ["NO REASON", false, 80, false]);
-  eq("stored result: not checked yet", storedResult(undefined).ok, false);
-  eq("stored result: last check failed", storedResult({ task_id: "k1", ok: false, problem: "timeout" }).problem.startsWith("The last check failed: timeout"), true);
 }
 
 // ---------- the reason finder ----------

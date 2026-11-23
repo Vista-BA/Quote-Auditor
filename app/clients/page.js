@@ -55,7 +55,7 @@ export default function Clients() {
           {data?.ok && list.length === 0 && <div className="empty">No checks yet. The first daily run fills this page.</div>}
           {list.length > 0 && (
             <table>
-              <thead><tr><th>Client</th><th>Checked</th><th>Tech 2, no reason</th><th>Hours, no reason</th><th>Over NTE</th><th>OT, no reason</th><th>Past quotes</th><th>Top job</th></tr></thead>
+              <thead><tr><th>Client</th><th>Checked</th><th>Tech 2, no reason</th><th>Hours, no reason</th><th>NTE increase</th><th>OT, no reason</th><th>Past quotes</th><th>Top job</th></tr></thead>
               <tbody>
                 {list.map((c) => (
                   <tr key={c.client} className="click" onClick={() => setOpen(c.client)}>
@@ -96,7 +96,7 @@ export default function Clients() {
                 <div className="fact"><div className="lbl">Ask first</div><div className="v">{sel.ask}</div></div>
               </div>
               <div className="facts">
-                <div className="fact"><div className="lbl">Over NTE</div><div className="v">{sel.over_nte}</div></div>
+                <div className="fact"><div className="lbl">NTE increase</div><div className="v">{sel.over_nte}</div></div>
                 <div className="fact"><div className="lbl">Overtime, no reason</div><div className="v">{sel.ot_no_reason} of {sel.ot}</div></div>
               </div>
               <a className="btn" href={`/clients/print?client=${encodeURIComponent(sel.client)}`} target="_blank" rel="noreferrer">Print report</a>
@@ -128,7 +128,7 @@ export default function Clients() {
               )}
               {sel.others?.length > 0 && (
                 <>
-                  <h3>Over NTE or overtime without a reason</h3>
+                  <h3>NTE increase needed, or overtime without a reason</h3>
                   <table>
                     <thead><tr><th>Work order</th><th>NTE</th><th>Overtime</th></tr></thead>
                     <tbody>

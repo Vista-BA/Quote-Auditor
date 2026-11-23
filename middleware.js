@@ -40,12 +40,6 @@ export async function middleware(req) {
   if (process.env.WEBHOOK_SECRET && req.nextUrl.pathname === "/api/clickup/webhook") {
     return NextResponse.next();
   }
-  // OBI cannot type a passcode either: it sends "Bearer <OBI_API_KEY>". Only /api/obi accepts it,
-  // only when OBI_API_KEY is set, and the route checks the key again.
-  const obiKey = process.env.OBI_API_KEY;
-  if (obiKey && req.nextUrl.pathname === "/api/obi" && await sameSecret(header, `Bearer ${obiKey}`)) {
-    return NextResponse.next();
-  }
   if (header.startsWith("Basic ")) {
     try {
       const decoded = atob(header.slice(6));
@@ -57,7 +51,7 @@ export async function middleware(req) {
   }
   return new NextResponse("Passcode required.", {
     status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Quote Builder", charset="UTF-8"' },
+    headers: { "WWW-Authenticate": 'Basic realm="Quote Auditor", charset="UTF-8"' },
   });
 }
 
