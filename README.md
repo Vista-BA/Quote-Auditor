@@ -70,6 +70,7 @@ If either is missing, the app still answers from keyword search alone and the li
 | `lib/impact.js`, `app/fixes/page.js` | **Fixes:** quotes flagged NO REASON and what became of them (reason added, Tech 2 removed or cut, still red), and the "Quote Check" tick against the verdict. |
 | `app/clients/print/page.js` | One client's quote review as a printable page. Print, or Save as PDF, from the browser. Marked as a draft for internal review. |
 | `lib/guide.js`, `app/guide/page.js` | **Field guide** (`/guide`): every line the OSHA Check field can show, the TL's decision (Rejected, On hold, Approved, Nothing to do) and the words to tell the dispatcher. The same words show in each work order's panel on `/queue`. Printable. |
+| `lib/audit.js` | **More checks, in code:** missing quote parts (what the tech found, scope, labor lines, total), the facts to confirm before sending, a possible duplicate (same client, store and job within 30 days), days waiting for approval, and each client's rules (`CLIENT_RULES`). Shown on `/queue`, never written to ClickUp. |
 | `lib/reason.js`, `app/api/reason/route.js`, `app/reason-finder.js` | **The reason finder:** paste the call or texts with the tech; the model points at the words that give a two-person reason, and code checks those words really are in the paste before suggesting a sentence for the quote. |
 | `app/eval/page.js` | **The eval, run from a browser** at `/eval`. Runs the eval cases against this site (fixed pipeline and agentic search), sends the meaning vector like a real user, and shows the KPI table and the agentic decision rule. Uses the site's own key: every check spends credit, and it asks first. Holdout results show as totals only. |
 | `lib/embed.js` | Builds the quote's meaning vector in the browser. Shared by the check page and `/eval`, so the eval sends exactly what a user's browser sends. |
@@ -110,6 +111,7 @@ See `.env.example` for the same list with notes and no values.
 | `CLICKUP_WRITE` | Plain | Vol 2: `on` lets the tool write its one line into the "OSHA Check" field in ClickUp after each check (`lib/fieldwrite.js`). Anything else, or unset, means nothing is written. Off by default. |
 | `CLICKUP_WRITE_LISTS` | Plain | Vol 2: the ClickUp list ids where that field may be written, comma separated, or `all`. Start with HECTOR: `901327439308`. |
 | `CLICKUP_FIELD_NAME` | Plain | Optional. The field's name, if it is not "OSHA Check". (`CLICKUP_FIELD_ID` instead pins one field id.) |
+| `CLIENT_RULES` | Config | Optional. Each client's rules as JSON, for example `{"EMCOR": {"overtime": "allowed"}, "Flynn": {"overtime": "not allowed"}, "Laser": {"overtime": "with reason"}}`. With a rule the overtime note says what the client allows instead of "for review". Unset means no rules. |
 | `CLICKUP_QC_FIELD` | Plain | Optional. The checkbox read for the Fixes page's comparison, if it is not "Quote Check". Read only. |
 
 After changing any setting: Deployments → **top row** → Redeploy. Never redeploy an older row (it puts old code live).

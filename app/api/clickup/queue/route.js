@@ -11,6 +11,7 @@ import { writeSettings } from "../../../../lib/fieldwrite";
 import { recentCalls } from "../../../../lib/webhook";
 import { crewCheckLine } from "../../../../lib/fieldline";
 import { nteText, overtimeOf, overtimeText } from "../../../../lib/quotefacts";
+import { completenessOf, confirmList, duplicatesOf, daysWaiting, isWaitingApproval, readRules, clientRule, overtimeRuleText } from "../../../../lib/audit";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -29,7 +30,7 @@ export async function GET() {
     await ensureTables(sql);
     const rows = await sql.query(
       `select task_id, task_name, task_url, status, entity, fm, state, headline, answer, history, job, quote, ok, problem, checked_at,
-         field_written_at, field_note, quote_check, nte_state, nte_pct, quote_hash, now_hash
+         field_written_at, field_note, quote_check, nte_state, nte_pct, quote_hash, now_hash, store, status_since
        from auto_checks order by checked_at desc limit 200`);
     // Every version of these quotes the tool has checked, oldest first, for the drawer's timeline.
     let versions = [];
@@ -39,6 +40,10 @@ export async function GET() {
     } catch { versions = []; }
     const token = process.env.CLICKUP_API_TOKEN;
     if (token) await fillQuotes({ rows, sql, getTask: (id) => getTask({ token, id }) });
+    // Possible duplicates are looked for across every checked quote with a store, not only these 200.
+    let dupes = {};
+    try { dupes = duplicatesOf(await sql.query(`select task_id, task_name, task_url, fm, store, job, checked_at from auto_checks where store is not null`)); } catch { dupes = {}; }
+    const rules = readRules();
     for (const r of rows) {
       r.history = (r.job && historyLine(history, r.entity, r.job, r.fm)) || r.history;
       // What the "Crew check" field in ClickUp would say. Preview only: nothing is written to ClickUp.
@@ -46,10 +51,17 @@ export async function GET() {
       // Shown in the tool only, never written to ClickUp (the owner's rule allows one field).
       r.nte = r.nte_state ? { state: r.nte_state, pct: r.nte_pct, text: nteText({ state: r.nte_state, pct: r.nte_pct }) } : null;
       const ot = overtimeOf(r.quote);
-      r.ot = ot.billed ? { reason: ot.reason, text: overtimeText(ot) } : null;
+      const rule = clientRule(rules, r.fm);
+      // Flagged unless the client's rule allows overtime: no rule means a reason must be written.
+      const otFlag = ot.billed && (rule?.overtime === "not allowed" || (rule?.overtime !== "allowed" && !ot.reason));
+      r.ot = ot.billed ? { reason: ot.reason, flag: otFlag, text: overtimeRuleText(ot, rule) || overtimeText(ot), rule: rule?.overtime || null } : null;
+      r.complete = completenessOf(r.quote);
+      r.confirm = r.ok ? confirmList(r.answer) : [];
+      r.duplicates = dupes[r.task_id] || [];
+      r.days_waiting = isWaitingApproval(r.status) ? daysWaiting(r.status_since) : null;
       r.changed_since = !!(r.now_hash && r.quote_hash && r.now_hash !== r.quote_hash);
       r.versions = versions.filter((v) => v.task_id === r.task_id).map(({ task_id, ...v }) => v);
-      delete r.quote_hash; delete r.now_hash; delete r.nte_state; delete r.nte_pct;
+      delete r.quote_hash; delete r.now_hash; delete r.nte_state; delete r.nte_pct; delete r.status_since;
     }
     return Response.json({ ok: true, rows, webhook, ...flags, history_entities: Object.keys(history?.entities || {}), history_built: history?.built || null });
   } catch (e) {

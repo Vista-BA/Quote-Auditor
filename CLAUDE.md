@@ -470,6 +470,17 @@ OSHA Check, and nothing here changes that.
   "about 120 lb, one tech holds it level") went NO REASON to OK SAFETY in about 14 seconds from the
   status change.
 
+### Nov 23: more checks in code (`lib/audit.js`)
+
+Shown in the tool only, no model call. Completeness looks for the parts by their labels, since the
+stored quote has its amounts removed. The facts to confirm are the summary line's "Need ..." values
+plus "Worth checking". A possible duplicate needs a store (the "Store" field, now kept on every read)
+and the same client and job type within 30 days. Days waiting counts from `status_since`, which
+`saveFacts` restarts whenever the status changes: a lower bound, starting Nov 23. `CLIENT_RULES`
+(JSON in Vercel) turns the overtime note from "for review" into the client's own rule; a client
+whose rule allows overtime is not counted for it. Tested in `tests/features.test.mjs` and the
+`saveFacts` change against a real Postgres 16.
+
 ### Two subsets will fail, by design
 
 These are not defects in the runner and not regressions. They record wanted

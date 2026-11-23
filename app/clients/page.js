@@ -99,6 +99,7 @@ export default function Clients() {
                 <div className="fact"><div className="lbl">NTE increase</div><div className="v">{sel.over_nte}</div></div>
                 <div className="fact"><div className="lbl">Overtime, no reason</div><div className="v">{sel.ot_no_reason} of {sel.ot}</div></div>
               </div>
+              {sel.rule && <div className="note sig"><b>Client rules:</b> overtime {sel.rule.overtime || "not set"}.</div>}
               <a className="btn" href={`/clients/print?client=${encodeURIComponent(sel.client)}`} target="_blank" rel="noreferrer">Print report</a>
               {sel.advice.length > 0 && <><h3>What to change in quoting</h3><ol className="why-list">{sel.advice.map((a, i) => <li key={i}>{a}</li>)}</ol></>}
               {sel.jobs.length > 0 && (
