@@ -212,6 +212,13 @@ eq("fresh facts carry no amount", JSON.stringify(facts).includes("690") || JSON.
   eq("same client, store and job within 30 days", Object.keys(dup).sort(), ["a", "b"]);
   eq("names the other quote", dup.a.map((x) => x.task_id), ["b"]);
   eq("two quotes without a store are never called duplicates", Object.keys(duplicatesOf([d("g", "EMCOR", null, "Door repair or replacement", "2026-11-01"), d("h", "EMCOR", "", "Door repair or replacement", "2026-11-02")])), []);
+  eq("a brand name alone is not a site: two Dollar Tree stores are not duplicates", Object.keys(duplicatesOf([d("i", "EMCOR", "Dollar Tree", "Door repair or replacement", "2026-11-01"), d("j", "EMCOR", "Dollar Tree", "Door repair or replacement", "2026-11-02")])), []);
+  eq("same brand at the same address is a duplicate", Object.keys(duplicatesOf([d("k", "EMCOR", "Dollar Tree | 12 Main St", "Door repair or replacement", "2026-11-01"), d("l", "EMCOR", "dollar tree | 12  main st", "Door repair or replacement", "2026-11-02")])).sort(), ["k", "l"]);
+  eq("same brand at different addresses is not", Object.keys(duplicatesOf([d("m", "EMCOR", "Dollar Tree | 12 Main St", "Door repair or replacement", "2026-11-01"), d("n", "EMCOR", "Dollar Tree | 40 Oak Ave", "Door repair or replacement", "2026-11-02")])), []);
+  const site = (fields) => taskFields({ id: "t", name: "n", status: { status: "quote ready" }, custom_fields: fields.map(([name, value]) => ({ name, type: "text", value })) }).store;
+  eq("the store is read with its address", site([["Store", "Dollar Tree"], ["17. Address", "12 Main St, Austin, TX"]]), "Dollar Tree | 12 Main St, Austin, TX");
+  eq("an address alone is the site", site([["Address", "40 Oak Ave"]]), "40 Oak Ave");
+  eq("a brand with no address stays as it is", site([["Store", "Dollar Tree"]]), "Dollar Tree");
   eq("days waiting from when it was first seen", daysWaiting("2026-11-20T00:00:00Z", Date.parse("2026-11-23T12:00:00Z")), 3);
   eq("only waiting for approval counts", [isWaitingApproval("!! waiting for approval"), isWaitingApproval("quote ready")], [true, false]);
   const rules = readRules({ CLIENT_RULES: '{"EMCOR": {"overtime": "allowed"}, "Flynn": {"overtime": "not allowed"}, "Laser": {"overtime": "with reason"}}' });
