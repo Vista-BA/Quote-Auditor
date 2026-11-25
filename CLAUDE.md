@@ -515,8 +515,10 @@ and looked each task up one by one, so older work orders were never reached: now
 lookups go 20 at a time, and fields filled from a stored answer are capped at `MAX_FILLS_PER_RUN`
 (40) per run because each is a ClickUp read and write. `?count=1` on the sync route (add
 `&statuses=a,b` to try other spellings) reads ClickUp and reports what a run would do, with no
-check and no write: use it before a large run and to confirm a status name. At 40 checks a run,
-3,000 quotes take about 75 runs; a refused ClickUp call (rate limit) is kept as a note and retried.
+check and no write: use it before a large run and to confirm a status name. A manual run also takes
+`&statuses=`, so the full run needs no change to the daily run's `CLICKUP_SYNC_STATUSES`. Doubled the
+same day to 80 checks a run, 16 at a time: 3,000 quotes take about 38 runs; a refused ClickUp call
+(rate limit) is kept as a note and retried.
 
 ### Two subsets will fail, by design
 

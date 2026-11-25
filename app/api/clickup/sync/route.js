@@ -32,12 +32,14 @@ export async function GET(req) {
 
   await ensureTables(sql);
 
-  const statuses = (process.env.CLICKUP_SYNC_STATUSES || "").split(",").map((s) => s.trim()).filter(Boolean);
+  // A manual run (behind the site passcode) may name its statuses with ?statuses=a,b, so a one-off
+  // run such as the full run over "done incurred" needs no change to the daily run's setting.
+  const asked = manual ? (url.searchParams.get("statuses") || "").split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const statuses = asked.length ? asked : (process.env.CLICKUP_SYNC_STATUSES || "").split(",").map((s) => s.trim()).filter(Boolean);
   // ?count=1: say what a run would do, with no check and no write. ?statuses=a,b tries other
   // status names in count mode only (to confirm the exact ClickUp spelling before a run).
   if (url.searchParams.get("count") === "1") {
-    const tryStatuses = (url.searchParams.get("statuses") || "").split(",").map((s) => s.trim()).filter(Boolean);
-    const use = tryStatuses.length ? tryStatuses : statuses.length ? statuses : DEFAULT_STATUSES;
+    const use = statuses.length ? statuses : DEFAULT_STATUSES;
     try {
       const c = await countQuotes({ list: (page) => listTasks({ token, team, statuses: use, page }), sql });
       return Response.json({ ok: true, count_only: true, statuses: use, ...c });

@@ -340,7 +340,7 @@ eq("log: writing off says nothing", fieldDetail({ field_written: 0, field_not_wr
   stored.get("b7").hash = "an older version";  // edited since its check (and already filled): counted as to check
   const c = await countQuotes({ list: listMore, sql: dbB });
   eq("count only checks nothing", checks, checksBefore);
-  eq("count only: what a run would do", [c.tasks, c.already_checked, c.to_check, c.runs_needed, c.field_not_yet_written, c.all_pages_read], [1250, 1199, 51, 2, 1200 - 2 * MAX_FILLS_PER_RUN, true]);
+  eq("count only: what a run would do", [c.tasks, c.already_checked, c.to_check, c.runs_needed, c.field_not_yet_written, c.all_pages_read], [1250, 1199, 51, Math.ceil(51 / MAX_PER_RUN), 1200 - 2 * MAX_FILLS_PER_RUN, true]);
   eq("count only: by status and cost", [c.by_status, c.estimated_cost_usd], [{ "quote ready": 1250 }, 0.08]);
 }
 
