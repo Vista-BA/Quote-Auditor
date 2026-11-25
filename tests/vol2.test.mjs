@@ -4,7 +4,8 @@ import { jobOf, lookup, lookupJob, historyLine, clientsOf, MIN_QUOTES } from "..
 import { parseTaskRef, fieldText } from "../lib/clickup.js";
 import { taskIdOf, isWaiting, waitingStatuses, statusNote, readBody, shapeOf, problemOf, outcomeOf, logCall, finishCall, logRefused, REFUSED, fieldDetail } from "../lib/webhook.js";
 import { syncQuotes, fillQuotes, MAX_PER_RUN, MAX_PAGES, MAX_FILLS_PER_RUN, countQuotes, hashOf } from "../lib/sync.js";
-import { writeSettings, writeDecision, writeField } from "../lib/fieldwrite.js";
+import { writeSettings, writeDecision, writeField, undoDecision, undoField, previousValue } from "../lib/fieldwrite.js";
+import { undoRun } from "../lib/undo.js";
 import { parseAnswer, secondTechHours, toneOf } from "../lib/answer.js";
 import { crewCheckLine, FIELD_MAX, KEYWORDS } from "../lib/fieldline.js";
 
@@ -242,7 +243,7 @@ eq("outcome no quote", outcomeOf({ checked: 0, failed: 0, unchanged: 0, no_quote
   ], ...(over.list ? { list: over.list } : {}) });
   const H0 = hashOf({ state: "", quote: Q });
   const line = "NO REASON: remove Tech 2 or add a two-person step";
-  eq("decision: write", writeDecision({ settings: S, task: wo(), checkedHash: H0, line, hashOf }), { write: true, fieldId: "f-osha" });
+  eq("decision: write", writeDecision({ settings: S, task: wo(), checkedHash: H0, line, hashOf }), { write: true, fieldId: "f-osha", prev: "" });
   eq("decision: off", writeDecision({ settings: writeSettings({}), task: wo(), checkedHash: H0, line, hashOf }).write, false);
   eq("decision: list not allowed", writeDecision({ settings: S, task: wo({ list: { id: "777", name: "Other" } }), checkedHash: H0, line, hashOf }).write, false);
   eq("decision: all lists", writeDecision({ settings: writeSettings({ CLICKUP_WRITE: "on", CLICKUP_WRITE_LISTS: "all" }), task: wo({ list: { id: "777" } }), checkedHash: H0, line, hashOf }).write, true);
@@ -264,6 +265,27 @@ eq("outcome no quote", outcomeOf({ checked: 0, failed: 0, unchanged: 0, no_quote
   eq("other list: reads and writes nothing", [w.written, reads, calls.length], [false, 0, 0]);
   w = await writeField({ token: "t", taskId: "w1", listId: "901", answer: RED, quote: Q, checkedHash: "older", hashOf, getTask, settings: S, fetchImpl });
   eq("newer quote in ClickUp: no write", [w.written, calls.length], [false, 0]);
+
+  // Nov 25: undo. The value from before is kept, and only the tool's own text is put back.
+  calls.length = 0;
+  w = await writeField({ token: "t", taskId: "w1", listId: "901", answer: RED, quote: Q, checkedHash: H0, hashOf, getTask: async () => wo({ field: "Call the store first" }), settings: S, fetchImpl });
+  eq("a write keeps what the field said before", [w.wrote, w.prev, w.line], [true, "Call the store first", line]);
+  eq("an earlier tool line counts as empty", [previousValue("OK SAFETY: Tech 2 OK for safety"), previousValue(" "), previousValue(null), previousValue("note")], ["", "", "", "note"]);
+  eq("undo: field still says what the tool wrote", undoDecision({ settings: S, task: wo({ field: line }), wrote: line }), { undo: true, fieldId: "f-osha" });
+  eq("undo: a person changed it since, left alone", undoDecision({ settings: S, task: wo({ field: "TL: checked, fine" }), wrote: line }).undo, false);
+  eq("undo: writing off, nothing", undoDecision({ settings: writeSettings({}), task: wo({ field: line }), wrote: line }).undo, false);
+  eq("undo: list not allowed, nothing", undoDecision({ settings: S, task: wo({ field: line, list: { id: "777" } }), wrote: line }).undo, false);
+  eq("undo: unknown text written, nothing", undoDecision({ settings: S, task: wo({ field: line }), wrote: null }).undo, false);
+  const ucalls = [];
+  const ufetch = async (url, init) => { ucalls.push([url, init.method, init.body ? JSON.parse(init.body) : null]); return { ok: true }; };
+  let u = await undoField({ token: "t", taskId: "w1", wrote: line, prev: "", getTask: async () => wo({ field: line }), settings: S, fetchImpl: ufetch });
+  eq("undo to empty removes the value of that one field", [u.undone, ucalls], [true, [["https://api.clickup.com/api/v2/task/w1/field/f-osha", "DELETE", null]]]);
+  ucalls.length = 0;
+  u = await undoField({ token: "t", taskId: "w1", wrote: line, prev: "Call the store first", getTask: async () => wo({ field: line }), settings: S, fetchImpl: ufetch });
+  eq("undo puts back the earlier text", [u.undone, ucalls], [true, [["https://api.clickup.com/api/v2/task/w1/field/f-osha", "POST", { value: "Call the store first" }]]]);
+  ucalls.length = 0;
+  u = await undoField({ token: "t", taskId: "w1", wrote: line, prev: "", getTask: async () => wo({ field: "TL edited" }), settings: S, fetchImpl: ufetch });
+  eq("undo touches nothing a person changed", [u.undone, ucalls.length], [false, 0]);
 
   // the sync loop calls the writer after a good check, and once for a quote checked before writing was on
   const rows = new Map();
@@ -342,6 +364,40 @@ eq("log: writing off says nothing", fieldDetail({ field_written: 0, field_not_wr
   eq("count only checks nothing", checks, checksBefore);
   eq("count only: what a run would do", [c.tasks, c.already_checked, c.to_check, c.runs_needed, c.field_not_yet_written, c.all_pages_read], [1250, 1199, 51, Math.ceil(51 / MAX_PER_RUN), 1200 - 2 * MAX_FILLS_PER_RUN, true]);
   eq("count only: by status and cost", [c.by_status, c.estimated_cost_usd], [{ "quote ready": 1250 }, 0.08]);
+}
+
+// the undo run: dry run first, then up to the limit per call, a refused call retried later
+{
+  const rows = new Map([["u1", { task_id: "u1", task_name: "WO u1", field_line: "NO REASON: remove Tech 2 or add a two-person step", field_prev: "", fw: "x" }],
+    ["u2", { task_id: "u2", task_name: "WO u2", field_line: "OK SAFETY: Tech 2 OK for safety", field_prev: "note", fw: "x" }],
+    ["u3", { task_id: "u3", task_name: "WO u3", field_line: "ONE TECH: no Tech 2 on this quote", field_prev: "", fw: "x" }]]);
+  const db = { query: async (q, p) => {
+    if (q.startsWith("select")) return [...rows.values()].filter((r) => r.fw && !r.undone);
+    if (q.startsWith("update")) { const r = rows.get(p[0]); r.undone = true; if (p[1]) r.fw = null; r.note = p[2]; return []; }
+    return [];
+  } };
+  const seen = [];
+  let tries = 0;
+  const undo = async (r, wrote) => { seen.push([r.task_id, wrote]); if (r.task_id === "u3" && tries++ === 0) throw new Error("ClickUp answered 429 to the undo"); return r.task_id === "u2" ? { undone: false, note: "Left alone: the field was changed after the tool wrote it." } : { undone: true, note: "Emptied, as it was before." }; };
+  let o = await undoRun({ sql: db, undo });
+  eq("undo dry run touches nothing", [o.dry_run, o.would_undo, seen.length], [true, 3, 0]);
+  o = await undoRun({ sql: db, undo, confirm: true, limit: 3 });
+  eq("undo: put back, left alone, refused", [o.undone, o.left_alone, o.failed, o.remaining], [1, 1, 1, 1]);
+  eq("undo: a field changed by a person keeps its write record", [rows.get("u2").fw, rows.get("u2").note.startsWith("Not undone")], ["x", true]);
+  o = await undoRun({ sql: db, undo, confirm: true });
+  eq("undo: the refused one is tried again", [o.undone, o.remaining, rows.get("u3").fw], [1, 0, null]);
+  eq("undo hands over the exact text the tool wrote", seen[0], ["u1", "NO REASON: remove Tech 2 or add a two-person step"]);
+}
+// an undone field is not filled again from the stored answer
+{
+  const RED2 = "The second tech is justified: this job needs two pairs of hands.\nOSHA: No | Safety: No | Two-person step: Yes";
+  const { taskFields } = await import("../lib/clickup.js");
+  const t = quoteTask("z1", hinge + " z1");
+  const row = { quote_hash: hashOf(taskFields(t)), job: "x", quote: "x", ok: true, answer: RED2, field_written_at: null, field_undone_at: "2026-11-25" };
+  const db = { query: async (q) => (q.startsWith("select") ? [row] : []) };
+  let fills = 0;
+  await syncQuotes({ list: async () => ({ tasks: [t], last: true }), sql: db, check: okCheck, history: null, afterCheck: async () => { fills++; return { written: true }; } });
+  eq("an undone field stays undone", fills, 0);
 }
 
 console.log(`${pass}/${pass + fail} passed`);

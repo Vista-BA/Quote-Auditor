@@ -520,6 +520,20 @@ check and no write: use it before a large run and to confirm a status name. A ma
 same day to 80 checks a run, 16 at a time: 3,000 quotes take about 38 runs; a refused ClickUp call
 (rate limit) is kept as a note and retried.
 
+### Nov 25: undo for the OSHA Check field (`lib/undo.js`, `/api/clickup/undo`)
+
+Asked for before writing was opened to all lists. Every write now keeps the exact text written
+(`field_line`) and what the field said before the tool's first write (`field_prev`; one of the
+tool's own lines from before Nov 25 counts as empty). `/api/clickup/undo?manual=1` is a dry run
+(counts only); `&confirm=1` puts back up to 40 per call: the earlier text is written back, or the
+value removed (ClickUp's DELETE on that one field) when it was empty, and only where the field still
+says exactly what the tool wrote. A field a person changed is left alone and marked so. An undone
+field is not filled again from the stored answer, but a new version of the quote is checked and
+written as usual, so undo first and then narrow `CLICKUP_WRITE_LISTS`. Undo is a write to the same
+one field, so it follows the same rules (CLICKUP_WRITE=on, list in CLICKUP_WRITE_LISTS). It cannot
+unsend ClickUp notifications or undo what another ClickUp automation did on the change. Tested with
+fakes and against a real Postgres 16; each guard was broken on purpose and a test failed.
+
 ### Two subsets will fail, by design
 
 These are not defects in the runner and not regressions. They record wanted
