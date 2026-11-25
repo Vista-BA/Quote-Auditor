@@ -481,6 +481,20 @@ and the same client and job type within 30 days. Days waiting counts from `statu
 whose rule allows overtime is not counted for it. Tested in `tests/features.test.mjs` and the
 `saveFacts` change against a real Postgres 16.
 
+### Nov 25: the thinking setting (`CLAUDE_THINKING`)
+
+Measured on the live site (Haiku 5.5 through OpenRouter, 4 eval cases): a check reads about 7,500
+tokens, of which 6,918 are the skill prompt served from cache, and writes 1,300 to 2,000. The visible
+answer is under 9 lines, so most of what is written is hidden thinking, and writing is billed at 5
+times reading: about 89% of a check's cost. Shortening the prompt would save about 2%. `CLAUDE_THINKING`
+(`off`, `low`, unset = model default) is the lever: Anthropic's API gets `thinking: disabled` on Haiku
+5.5, `between_tools` on Sonnet 5.5 (which rejects `disabled`), lowest effort on Opus 5.5 (which cannot
+turn thinking off); OpenRouter gets `reasoning: {enabled: false}` or `{effort: "low"}`. The OpenRouter
+field names were written without its docs (openrouter.ai unreachable from the session); the live run
+confirms them only if `output_tokens` drops. It is a model setting, not one of the four round levers,
+so compare it like a model: same day, main set and holdout, one setting at a time, result files copied
+aside between runs because the file name carries the model only.
+
 ### Two subsets will fail, by design
 
 These are not defects in the runner and not regressions. They record wanted

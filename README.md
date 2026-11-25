@@ -97,6 +97,7 @@ See `.env.example` for the same list with notes and no values.
 | `ANTHROPIC_API_KEY` | Secret | Pays for the AI. Required. An Anthropic key (`sk-ant-...`), or an OpenRouter key (`sk-or-...`), which sends the calls through OpenRouter instead. Never share it or put it in code. |
 | `OPENROUTER_MODEL` | Config | Optional. The model id on OpenRouter, if it is not `anthropic/claude-haiku-5.5` (worked out from `CLAUDE_MODEL`). |
 | `CLAUDE_MODEL` | Config | Which model answers. Unset means `claude-haiku-5-5`. |
+| `CLAUDE_THINKING` | Config | Optional. `off` or `low` cuts the model's hidden thinking, which is most of a check's cost. Unset keeps the model's default. Change it only with an eval run. `/api/health` shows the setting in use. |
 | `SITE_PASSCODE` | Secret | The lock. Keep it on whenever the site is not being demoed: unset means anyone who finds the URL can spend your API credit. |
 | `DATABASE_URL` | Secret | The Neon connection string, added by Vercel when the database is attached. Without it the app still answers, but keyword-only, with no past jobs and no log. |
 | `AGENTIC_RETRIEVAL` | Config | `on` lets `/api/check` run the agentic retrieval experiment for requests that ask for it (`node evals/run_eval.js <url> --agentic`). Unset means off. The screen never asks, so users get the fixed pipeline either way. |
