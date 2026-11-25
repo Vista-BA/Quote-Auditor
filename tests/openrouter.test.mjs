@@ -58,6 +58,22 @@ eq("the setting reaches the OpenRouter request", calls.at(-1).body.reasoning, { 
 delete process.env.CLAUDE_THINKING;
 await callClaude({ key: "sk-or-v1-x", model: "claude-sonnet-5-5", user: "x", maxTokens: 4000 });
 eq("unset again, nothing extra is sent", calls.at(-1).body.reasoning, undefined);
+process.env.CLAUDE_THINKING = "off";
+// Nov 25: OpenRouter refused thinking off on Sonnet 5.5 and every check failed. Now it retries plain.
+let sent = [];
+globalThis.fetch = async (url, init) => { const b = JSON.parse(init.body); sent.push(b); return b.reasoning || b.thinking
+  ? new Response(JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled.", type: "invalid_request_error" } }), { status: 400 })
+  : new Response(JSON.stringify({ content: [{ type: "text", text: "ok" }], usage: { output_tokens: 1 }, choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage2: 1 }), { status: 200 }); };
+r = await callClaude({ key: "sk-or-v1-x", model: "claude-sonnet-5-5", user: "x", maxTokens: 4000 });
+eq("a refused thinking setting is retried without it (OpenRouter)", [r.ok, sent.length, sent[1]?.reasoning, !!r.data?.usage?.thinking_dropped], [true, 2, undefined, true]);
+sent = [];
+r = await callClaude({ key: "sk-ant-api03-x", model: "claude-sonnet-5-5", user: "x", maxTokens: 4000 });
+eq("a refused thinking setting is retried without it (Anthropic)", [r.ok, sent.length, sent[1]?.thinking, !!r.data?.usage?.thinking_dropped], [true, 2, undefined, true]);
+globalThis.fetch = async (url, init) => { sent.push(1); return new Response(JSON.stringify({ error: { message: "Invalid model" } }), { status: 400 }); };
+sent = [];
+r = await callClaude({ key: "sk-or-v1-x", model: "claude-sonnet-5-5", user: "x", maxTokens: 4000 });
+eq("any other error is not retried", [r.ok, sent.length], [false, 1]);
+delete process.env.CLAUDE_THINKING;
 
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
