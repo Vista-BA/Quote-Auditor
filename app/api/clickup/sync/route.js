@@ -11,7 +11,7 @@
 import { POST as runCheck } from "../../check/route";
 import { listTasks, getTask } from "../../../../lib/clickup";
 import { tracker, followUp } from "../../../../lib/track";
-import { ensureTables, syncQuotes } from "../../../../lib/sync";
+import { ensureTables, syncQuotes, countQuotes } from "../../../../lib/sync";
 import { fieldWriter } from "../../../../lib/fieldwrite";
 import { getSql } from "../../../../lib/db";
 export const dynamic = "force-dynamic";
@@ -32,7 +32,21 @@ export async function GET(req) {
 
   await ensureTables(sql);
 
-  const statuses = (process.env.CLICKUP_SYNC_STATUSES || "").split(",").map((s) => s.trim()).filter(Boolean);
+  // A manual run (behind the site passcode) may name its statuses with ?statuses=a,b, so a one-off
+  // run such as the full run over "done incurred" needs no change to the daily run's setting.
+  const asked = manual ? (url.searchParams.get("statuses") || "").split(",").map((s) => s.trim()).filter(Boolean) : [];
+  const statuses = asked.length ? asked : (process.env.CLICKUP_SYNC_STATUSES || "").split(",").map((s) => s.trim()).filter(Boolean);
+  // ?count=1: say what a run would do, with no check and no write. ?statuses=a,b tries other
+  // status names in count mode only (to confirm the exact ClickUp spelling before a run).
+  if (url.searchParams.get("count") === "1") {
+    const use = statuses.length ? statuses : DEFAULT_STATUSES;
+    try {
+      const c = await countQuotes({ list: (page) => listTasks({ token, team, statuses: use, page }), sql });
+      return Response.json({ ok: true, count_only: true, statuses: use, ...c });
+    } catch (e) {
+      return Response.json({ ok: false, problem: `Could not read ClickUp: ${e.message}` }, { status: 502 });
+    }
+  }
   let history = null;
   try { history = process.env.ENTITY_HISTORY ? JSON.parse(process.env.ENTITY_HISTORY) : null; } catch { history = null; }
 

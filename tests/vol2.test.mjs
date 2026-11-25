@@ -3,7 +3,7 @@
 import { jobOf, lookup, lookupJob, historyLine, clientsOf, MIN_QUOTES } from "../lib/history.js";
 import { parseTaskRef, fieldText } from "../lib/clickup.js";
 import { taskIdOf, isWaiting, waitingStatuses, statusNote, readBody, shapeOf, problemOf, outcomeOf, logCall, finishCall, logRefused, REFUSED, fieldDetail } from "../lib/webhook.js";
-import { syncQuotes, fillQuotes, MAX_PER_RUN, hashOf } from "../lib/sync.js";
+import { syncQuotes, fillQuotes, MAX_PER_RUN, MAX_PAGES, MAX_FILLS_PER_RUN, countQuotes, hashOf } from "../lib/sync.js";
 import { writeSettings, writeDecision, writeField } from "../lib/fieldwrite.js";
 import { parseAnswer, secondTechHours, toneOf } from "../lib/answer.js";
 import { crewCheckLine, FIELD_MAX, KEYWORDS } from "../lib/fieldline.js";
@@ -304,6 +304,44 @@ eq("log: writing off says nothing", fieldDetail({ field_written: 0, field_not_wr
   const refused = async () => { throw new Error("ClickUp answered 401 to the field write"); };
   const r = await syncQuotes({ list: async () => ({ tasks: [quoteTask("r1", hinge + " r1")], last: true }), sql: db4, check: okCheck, history: null, afterCheck: refused });
   eq("run summary counts refused writes and keeps the reason", [r.field_written, r.field_not_written, r.field_note], [0, 1, "ClickUp answered 401 to the field write"]);
+}
+
+// Nov 25: the full run over about 3,000 "done incurred" and quote ready work orders.
+{
+  // A database with every task already checked and its field not yet written.
+  const big = (n, from = 0) => Array.from({ length: n }, (_, i) => quoteTask(`b${from + i}`, `${hinge} ${from + i}`));
+  const all = big(1200);
+  const stored = new Map(all.map((t) => [t.id, { hash: null }]));
+  const answer = "The second tech is justified: this job needs two pairs of hands.\nOSHA: No | Safety: No | Two-person step: Yes";
+  const dbB = { query: async (q, p) => {
+    if (q.startsWith("select task_id, quote_hash")) return p[0].filter((id) => stored.has(id)).map((id) => ({ task_id: id, quote_hash: stored.get(id).hash, ok: true, field_written_at: stored.get(id).fw || null }));
+    if (q.startsWith("select")) { const r = stored.get(p[0]); return r?.hash ? [{ quote_hash: r.hash, job: "x", quote: "x", ok: true, answer, field_written_at: r.fw || null }] : []; }
+    if (q.startsWith("update auto_checks set field_written_at")) { stored.get(p[0]).fw = q.includes("now()") ? "now" : null; return []; }
+    if (q.startsWith("insert")) { stored.set(p[0], { hash: p[7] }); return []; }
+    return [];
+  } };
+  // hashes as a run would store them
+  const { taskFields } = await import("../lib/clickup.js");
+  for (const t of all) stored.get(t.id).hash = hashOf(taskFields(t));
+  const listAll = async (page) => ({ tasks: all.slice(page * 100, page * 100 + 100), last: (page + 1) * 100 >= all.length });
+  let fillsSeen = 0;
+  const writer = async () => { fillsSeen++; return { written: true, note: null }; };
+  let out = await syncQuotes({ list: listAll, sql: dbB, check: okCheck, history: null, afterCheck: writer });
+  eq("a run reads past the first 500 work orders", out.seen, 1200);
+  eq("fills from stored answers are capped per run, the rest wait", [fillsSeen, out.field_written, out.left_for_next_run], [MAX_FILLS_PER_RUN, MAX_FILLS_PER_RUN, true]);
+  out = await syncQuotes({ list: listAll, sql: dbB, check: okCheck, history: null, afterCheck: writer });
+  eq("the next run fills the next ones, not the same", [fillsSeen, out.field_written], [2 * MAX_FILLS_PER_RUN, MAX_FILLS_PER_RUN]);
+  eq("page limit covers about 3,000 work orders", MAX_PAGES * 100 >= 3000, true);
+
+  // count only: no check, no write
+  const extra = big(50, 5000);
+  const listMore = async (page) => { const both = [...all, ...extra]; return { tasks: both.slice(page * 100, page * 100 + 100), last: (page + 1) * 100 >= both.length }; };
+  let checksBefore = checks;
+  stored.get("b7").hash = "an older version";  // edited since its check (and already filled): counted as to check
+  const c = await countQuotes({ list: listMore, sql: dbB });
+  eq("count only checks nothing", checks, checksBefore);
+  eq("count only: what a run would do", [c.tasks, c.already_checked, c.to_check, c.runs_needed, c.field_not_yet_written, c.all_pages_read], [1250, 1199, 51, Math.ceil(51 / MAX_PER_RUN), 1200 - 2 * MAX_FILLS_PER_RUN, true]);
+  eq("count only: by status and cost", [c.by_status, c.estimated_cost_usd], [{ "quote ready": 1250 }, 0.08]);
 }
 
 console.log(`${pass}/${pass + fail} passed`);

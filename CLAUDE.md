@@ -506,6 +506,20 @@ with its default thinking: 88% main, 83.3% holdout (the same as Haiku; the 3 mai
 by-design logic cases), about 830 output tokens and $0.011 per check, against Haiku's about 1,800 and
 $0.001 to $0.002.
 
+### Nov 25: the full run (done incurred and quote ready, about 3,000)
+
+Approved by Hector: check and write the OSHA Check field on every "done incurred" and quote ready
+work order (the older ones are for history), on Haiku. `CLICKUP_SYNC_STATUSES` names the statuses;
+it replaces the default, so the waiting statuses must stay in it. A run read only 5 pages (500 tasks)
+and looked each task up one by one, so older work orders were never reached: now `MAX_PAGES` is 40,
+lookups go 20 at a time, and fields filled from a stored answer are capped at `MAX_FILLS_PER_RUN`
+(40) per run because each is a ClickUp read and write. `?count=1` on the sync route (add
+`&statuses=a,b` to try other spellings) reads ClickUp and reports what a run would do, with no
+check and no write: use it before a large run and to confirm a status name. A manual run also takes
+`&statuses=`, so the full run needs no change to the daily run's `CLICKUP_SYNC_STATUSES`. Doubled the
+same day to 80 checks a run, 16 at a time: 3,000 quotes take about 38 runs; a refused ClickUp call
+(rate limit) is kept as a note and retried.
+
 ### Two subsets will fail, by design
 
 These are not defects in the runner and not regressions. They record wanted
