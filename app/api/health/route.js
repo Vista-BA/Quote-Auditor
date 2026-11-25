@@ -1,7 +1,7 @@
 // Health check: confirms the Claude API key in Vercel works.
 // Sends one tiny request. Never returns or logs the key itself.
 import { getModel } from "../../../lib/model";
-import { callClaude, llmKey } from "../../../lib/anthropic";
+import { callClaude, llmKey, thinkingMode } from "../../../lib/anthropic";
 export const dynamic = "force-dynamic";
 
 // A health check that hangs for a minute is not a health check, so it waits far less than /api/check.
@@ -15,6 +15,6 @@ export async function GET() {
   const { model, note } = getModel();
   if (!model) return Response.json({ ok: false, problem: note });
   const call = await callClaude({ key, model, user: "Reply with: ok", maxTokens: 5, timeoutMs: HEALTH_TIMEOUT_MS });
-  if (call.ok) return Response.json({ ok: true, model, note, message: "Claude API key works." });
+  if (call.ok) return Response.json({ ok: true, model, note, thinking: thinkingMode(), message: "Claude API key works." });
   return Response.json({ ok: false, model, status: call.status, problem: call.problem, detail: call.detail });
 }
