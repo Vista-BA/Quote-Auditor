@@ -474,8 +474,10 @@ OSHA Check, and nothing here changes that.
 
 Shown in the tool only, no model call. Completeness looks for the parts by their labels, since the
 stored quote has its amounts removed. The facts to confirm are the summary line's "Need ..." values
-plus "Worth checking". A possible duplicate needs a store (the "Store" field, now kept on every read)
-and the same client and job type within 30 days. Days waiting counts from `status_since`, which
+plus "Worth checking". A possible duplicate needs a site (the "Store" field plus "17. Address", kept on every read)
+and the same client and job type within 30 days. "Store" alone is usually the brand (26 of 200
+queue rows said "Dollar Tree"), so a value with no digit (no address or store number) is never
+matched: on Nov 24 the brand-only key called 63 of 200 quotes duplicates, all different sites. Days waiting counts from `status_since`, which
 `saveFacts` restarts whenever the status changes: a lower bound, starting Nov 23. `CLIENT_RULES`
 (JSON in Vercel) turns the overtime note from "for review" into the client's own rule; a client
 whose rule allows overtime is not counted for it. Tested in `tests/features.test.mjs` and the
