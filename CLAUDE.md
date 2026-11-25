@@ -497,6 +497,15 @@ confirms them only if `output_tokens` drops. It is a model setting, not one of t
 so compare it like a model: same day, main set and holdout, one setting at a time, result files copied
 aside between runs because the file name carries the model only.
 
+Nov 25, live: `off` on Sonnet 5.5 through OpenRouter was refused for every check ("Reasoning is
+mandatory for this endpoint and cannot be disabled"), so the site checked nothing until the variable
+was deleted. `low` showed the same error, but it is not known whether that deploy carried `low` or
+still `off`. Since then a refused thinking setting is sent again once without it (both paths), and
+`usage.thinking_dropped` says so: a setting can lower cost, never stop checks. Same day, Sonnet 5.5
+with its default thinking: 88% main, 83.3% holdout (the same as Haiku; the 3 main failures are the
+by-design logic cases), about 830 output tokens and $0.011 per check, against Haiku's about 1,800 and
+$0.001 to $0.002.
+
 ### Two subsets will fail, by design
 
 These are not defects in the runner and not regressions. They record wanted
